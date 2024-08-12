@@ -1,61 +1,63 @@
-//
-//  ContentView.swift
-//  ExpenseTracker
-//
-//  Created by Shayan Ameen on 12/08/2024.
-//
-
 import SwiftUI
 import SwiftData
 
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
-
-    var body: some View {
-        NavigationSplitView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
-                    }
-                }
-                .onDelete(perform: deleteItems)
-            }
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                }
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
-                    }
-                }
-            }
-        } detail: {
-            Text("Select an item")
-        }
-    }
-
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
-        }
-    }
-
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(items[index])
+  @Environment(\.modelContext) private var modelContext
+  
+  @Query(sort: \Expense.date) private var expenses: [Expense] = []
+  
+  @State private var expenseToEdit: Expense?
+  @State private var isShowingItemState = false
+  
+  var body: some View {
+    NavigationStack {
+      List() {
+        ForEach(expenses) { expense in
+          ExpenseItem(expense: expense)
+            .onTapGesture {
+              expenseToEdit = expense
             }
         }
+        .onDelete { IndexSet in
+          for index in IndexSet {
+            modelContext.delete(expenses[index])
+          }
+        }
+      }
+      .navigationTitle("Expenses")
+      .navigationBarTitleDisplayMode(.large)
+      .sheet(isPresented: $isShowingItemState) {
+        NewExpenseSheet()
+      }
+      .sheet(item: $expenseToEdit) { expense in
+        EditExpenseSheet(expense: expense)
+      }
+      .toolbar {
+        if !expenses.isEmpty {
+          Button("Add Expenses", systemImage: "plus") {
+            isShowingItemState = true
+          }
+        }
+      }
+      .overlay {
+        if expenses.isEmpty {
+          ContentUnavailableView(label: {
+            Label("No Expenses", systemImage: "list.bullet.rectangle.portrait")
+          }, description: {
+            Text("Add some expenses to get started.")
+          }, actions: {
+            Button("Add Expenses") {
+              isShowingItemState = true
+            }
+          })
+          .offset(y: -64)
+        }
+      }
     }
+  }
 }
 
 #Preview {
-    ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
+  ContentView()
+    .modelContainer(for: [Expense.self], inMemory: true)
 }
